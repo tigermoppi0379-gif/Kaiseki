@@ -38,9 +38,12 @@ const ROOM_COLORS = {
   "スズナ": { main: "#6B7280", soft: "#FAFAFA", border: "#D1D5DB" },     // 白(グレーで縁取り)
 };
 const STORAGE_KEY = "kaiseki-board-v2";
+const DATE_KEY = "kaiseki-board-v2-date";
 
 function pad(n) { return n.toString().padStart(2, "0"); }
 function fmtTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+// "2026-07-03" のような日付文字列（日付が変わったかどうかの判定に使う）
+function todayStr(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function parseTimeToday(hhmm, now) {
   const [h, m] = hhmm.split(":").map(Number);
   const d = new Date(now);
@@ -80,29 +83,73 @@ export default function KaisekiBoard() {
   const [showCourseSettings, setShowCourseSettings] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
-  const [testMode, setTestMode] = useState(false);
-  const [testTime, setTestTime] = useState("18:00");
 
+  // 15秒ごとに現在時刻を更新。あわせて「日付が変わっていないか」も毎回チェックする。
   useEffect(() => {
-    if (testMode) return;
-    const t = setInterval(() => setNow(new Date()), 15000);
+    const t = setInterval(() => {
+      setNow(new Date());
+      checkDateAndResetIfNeeded();
+    }, 15000);
     return () => clearInterval(t);
-  }, [testMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  useEffect(() => {
-    setNow(testMode ? parseTimeToday(testTime, new Date()) : new Date());
-  }, [testMode, testTime]);
+  // 保存データを全部初期状態に戻す（日付が変わった時／手動リセットの両方で使う）
+  function resetAllData(newDateStr) {
+    const next = {
+      rooms: defaultRooms(),
+      courseTimes: DEFAULT_COURSE_TIMES,
+      leadTimes: DEFAULT_LEAD,
+      doneSet: {},
+      delayMap: {},
+    };
+    setRooms(next.rooms);
+    setCourseTimes(next.courseTimes);
+    setLeadTimes(next.leadTimes);
+    setDoneSet(next.doneSet);
+    setDelayMap(next.delayMap);
+    persist(next);
+    try {
+      window.localStorage.setItem(DATE_KEY, newDateStr);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // 保存されている日付と「今日」を比較し、違っていればデータを初期化する
+  function checkDateAndResetIfNeeded() {
+    const todaysDate = todayStr(new Date());
+    try {
+      const savedDate = window.localStorage.getItem(DATE_KEY);
+      if (savedDate && savedDate !== todaysDate) {
+        resetAllData(todaysDate);
+      } else if (!savedDate) {
+        window.localStorage.setItem(DATE_KEY, todaysDate);
+      }
+    } catch (e) {
+      // localStorage が使えない環境では何もしない
+    }
+  }
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data.rooms) setRooms(data.rooms);
-        if (data.courseTimes) setCourseTimes(data.courseTimes);
-        if (data.leadTimes) setLeadTimes(data.leadTimes);
-        if (data.doneSet) setDoneSet(data.doneSet);
-        if (data.delayMap) setDelayMap(data.delayMap);
+      const todaysDate = todayStr(new Date());
+      const savedDate = window.localStorage.getItem(DATE_KEY);
+
+      if (savedDate && savedDate !== todaysDate) {
+        // 前回保存された日付と今日が違う → 日付をまたいだので全部リセット
+        resetAllData(todaysDate);
+      } else {
+        if (!savedDate) window.localStorage.setItem(DATE_KEY, todaysDate);
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const data = JSON.parse(raw);
+          if (data.rooms) setRooms(data.rooms);
+          if (data.courseTimes) setCourseTimes(data.courseTimes);
+          if (data.leadTimes) setLeadTimes(data.leadTimes);
+          if (data.doneSet) setDoneSet(data.doneSet);
+          if (data.delayMap) setDelayMap(data.delayMap);
+        }
       }
     } catch (e) {
       // nothing saved yet
@@ -176,6 +223,14 @@ export default function KaisekiBoard() {
   function setDelay(roomId, value) {
     const min = parseInt(value) || 0;
     save({ delayMap: { ...delayMap, [roomId]: min } });
+  }
+
+  // ボードの進行状況（提供完了チェック・遅延）だけをリセットする。
+  // 部屋の設定（人数・料理内容など）はそのまま残る。
+  function resetProgress() {
+    const ok = window.confirm("提供完了のチェックと遅延設定をすべてリセットします。よろしいですか？");
+    if (!ok) return;
+    save({ doneSet: {}, delayMap: {} });
   }
 
   // ---- build task list ----
@@ -276,7 +331,7 @@ export default function KaisekiBoard() {
           <ChefHat size={26} color="#D97706" />
           <div>
             <h1 style={styles.h1}>部屋出し懐石 仕込みボード</h1>
-            <div style={styles.sub}>現在 {fmtTime(now)}{testMode && " (テスト時刻)"} ・ チーム共有</div>
+            <div style={styles.sub}>現在 {fmtTime(now)} ・ チーム共有</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -300,13 +355,6 @@ export default function KaisekiBoard() {
               <Clock size={14} /> 遅延管理
             </button>
           </div>
-          <label style={styles.testToggle}>
-            <input type="checkbox" checked={testMode} onChange={(e) => setTestMode(e.target.checked)} style={{ width: 14, height: 14 }} />
-            テスト時刻
-          </label>
-          {testMode && (
-            <input type="time" value={testTime} onChange={(e) => setTestTime(e.target.value)} style={styles.select} />
-          )}
         </div>
       </header>
 
@@ -320,9 +368,14 @@ export default function KaisekiBoard() {
             <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 10 }}>
               各便の完成(提供)時間とアラーム基本リードタイムを設定できます。アレルギー対応・連泊で個別に変わる便は、各お部屋のカードで上書きしてください。
             </div>
-            <button style={styles.ghostBtn} onClick={() => setShowCourseSettings((s) => !s)}>
-              便の完成時間 / 基本リードタイムを編集
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={styles.ghostBtn} onClick={() => setShowCourseSettings((s) => !s)}>
+                便の完成時間 / 基本リードタイムを編集
+              </button>
+              <button style={{ ...styles.ghostBtn, color: "#DC2626", borderColor: "#DC2626" }} onClick={resetProgress}>
+                ボードの進行状況をリセット
+              </button>
+            </div>
             {showCourseSettings && (
               <div style={{ marginTop: 12, overflowX: "auto" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
