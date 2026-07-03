@@ -233,6 +233,14 @@ export default function KaisekiBoard() {
     save({ doneSet: {}, delayMap: {} });
   }
 
+  // 事前設定（部屋の設定・便の完成時間・基本リードタイム）だけを初期状態に戻す。
+  // 提供完了チェックや遅延はそのまま残る。
+  function resetSetup() {
+    const ok = window.confirm("部屋の設定・便の完成時間・基本リードタイムをすべて初期状態に戻します。よろしいですか？");
+    if (!ok) return;
+    save({ rooms: defaultRooms(), courseTimes: DEFAULT_COURSE_TIMES, leadTimes: DEFAULT_LEAD });
+  }
+
   // ---- build task list ----
   // All courses for active rooms are shown from the start (no waiting on a
   // previous course to be checked off). "次の便" highlighting still shows
@@ -378,8 +386,8 @@ export default function KaisekiBoard() {
               <button style={styles.ghostBtn} onClick={() => setShowCourseSettings((s) => !s)}>
                 便の完成時間 / 基本リードタイムを編集
               </button>
-              <button style={{ ...styles.ghostBtn, color: "#DC2626", borderColor: "#DC2626" }} onClick={resetProgress}>
-                ボードの進行状況をリセット
+              <button style={{ ...styles.ghostBtn, color: "#DC2626", borderColor: "#DC2626" }} onClick={resetSetup}>
+                事前設定をリセット
               </button>
             </div>
             {showCourseSettings && (
@@ -476,6 +484,11 @@ export default function KaisekiBoard() {
       {/* ================= BOARD VIEW ================= */}
       {view === "board" && loaded && (
         <>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+            <button style={{ ...styles.ghostBtnSmall, borderStyle: "solid", color: "#DC2626", borderColor: "#DC2626" }} onClick={resetProgress}>
+              ボードの進行状況をリセット
+            </button>
+          </div>
           <div style={styles.sectionLabel}>現在の便（各部屋の次のタスク）</div>
           <div style={styles.list}>
             {boardGroups.length === 0 && (
