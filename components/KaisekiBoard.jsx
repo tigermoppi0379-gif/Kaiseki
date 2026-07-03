@@ -331,7 +331,7 @@ export default function KaisekiBoard() {
           <ChefHat size={26} color="#D97706" />
           <div>
             <h1 style={styles.h1}>部屋出し懐石 仕込みボード</h1>
-            <div style={styles.sub}>現在 {fmtTime(now)} ・ チーム共有</div>
+            <div style={styles.sub}>チーム共有</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -357,6 +357,12 @@ export default function KaisekiBoard() {
           </div>
         </div>
       </header>
+
+      <div style={styles.nowClockBox}>
+        <Clock size={22} color="#D97706" />
+        <span style={styles.nowClockText}>{fmtTime(now)}</span>
+        <span style={styles.nowClockLabel}>現在時刻</span>
+      </div>
 
       {error && <div style={styles.errorBar}>{error}</div>}
       {!loaded && <div style={{ color: "#6B7280", padding: 20 }}>読み込み中…</div>}
@@ -426,8 +432,13 @@ export default function KaisekiBoard() {
               <div style={{ ...styles.formGrid3, gridTemplateColumns: "1fr 1fr" }}>
                 <label style={styles.label}>
                   人数
-                  <input style={styles.input} value={room.guests} placeholder="例）4名"
-                    onChange={(e) => updateRoom(room.id, { guests: e.target.value })} />
+                  <select style={styles.input} value={room.guests}
+                    onChange={(e) => updateRoom(room.id, { guests: e.target.value })}>
+                    <option value="">未選択</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={`${n}名`}>{n}名</option>
+                    ))}
+                  </select>
                 </label>
                 <label style={styles.label}>
                   料理の種類
@@ -714,6 +725,9 @@ const styles = {
   headerLeft: { display: "flex", alignItems: "center", gap: 10 },
   h1: { fontSize: 17, margin: 0, letterSpacing: 0.5, fontWeight: 700, color: "#1A1A1A" },
   sub: { fontSize: 12, color: "#6B7280", marginTop: 2, fontFamily: "monospace" },
+  nowClockBox: { display: "flex", alignItems: "baseline", gap: 10, background: "#FFFBEB", border: "2px solid #D97706", borderRadius: 12, padding: "10px 18px", marginBottom: 16, width: "fit-content" },
+  nowClockText: { fontSize: 44, fontWeight: 800, fontFamily: "monospace", color: "#1A1A1A", letterSpacing: -1, lineHeight: 1 },
+  nowClockLabel: { fontSize: 12, color: "#92400E", fontWeight: 700 },
   errorBar: { background: "#DC2626", color: "#fff", padding: "8px 12px", borderRadius: 8, marginBottom: 12, fontSize: 13 },
   alertBanner: { display: "flex", gap: 10, alignItems: "flex-start", background: "#FEF2F2", border: "1px solid #FCA5A5", color: "#991B1B", padding: "12px 14px", borderRadius: 10, marginBottom: 16, animation: "pulse-red 2s infinite" },
   card: { background: "#FFFFFF", borderRadius: 12, padding: 16, border: "1px solid #E5E7EB" },
